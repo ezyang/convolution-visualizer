@@ -1,3 +1,7 @@
+h1 { margin-bottom: 0 }
+
+.author { margin-left: 2em; }
+
 body {
   font: 14px "Century Gothic", Futura, sans-serif;
   margin: 20px;
@@ -5,33 +9,24 @@ body {
 
 .form {
   margin-bottom: 1em;
+  float: left;
+}
+
+.viewport {
+  margin-left: 16em;
 }
 
 .grid-container {
   margin-bottom: 1em;
 }
 
-.row:after {
-  clear: both;
-  content: "";
-  display: table;
+table {
+  border-collapse: collapse;
 }
 
-.square {
+td {
   background: #fff;
   border: 1px solid #999;
-  float: left;
-  font-size: 24px;
-  font-weight: bold;
-  line-height: 34px;
   height: 34px;
-  margin-right: -1px;
-  margin-top: -1px;
-  padding: 0;
-  text-align: center;
   width: 34px;
-}
-
-.square:focus {
-  outline: none;
 }

@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "d3": "^4.13.0",
+    "d3-scale-chromatic": "^1.2.0",
+    "d3v4": "^4.2.2",
     "react": "^16.2.0",
     "react-dom": "^16.2.0",
     "react-scripts": "1.1.1"

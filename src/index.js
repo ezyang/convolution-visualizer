@@ -118,6 +118,15 @@ class App extends React.Component {
       output: output,
     }, this.state);
 
+    const onChange = (state_key) => {
+      return (e) => {
+        const r = parseInt(e.target.value, 10);
+        if (typeof r !== "undefined") {
+          this.setState({[state_key]: r});
+        }
+      };
+    };
+
     return (
       <div>
         <h1>Convolution Visualizer</h1>
@@ -136,7 +145,7 @@ class App extends React.Component {
             <Slider min={minWhile(16, 1, (x) => paramsOK(x, weight_size, padding, dilation, stride))}
                     max="16"
                     value={input_size}
-                    onChange={(e) => this.setState({input_size: parseInt(e.target.value, 10)})}
+                    onChange={onChange("input_size")}
                     />
           </fieldset>
           <fieldset>
@@ -144,7 +153,7 @@ class App extends React.Component {
             <Slider min="1"
                     max={maxWhile(1, 100, (x) => paramsOK(input_size, x, padding, dilation, stride))}
                     value={weight_size}
-                    onChange={(e) => this.setState({weight_size: parseInt(e.target.value, 10)})}
+                    onChange={onChange("weight_size")}
                     />
           </fieldset>
           <fieldset>
@@ -153,7 +162,7 @@ class App extends React.Component {
                                   (x) => paramsOK(input_size, weight_size, x, dilation, stride))}
                     max={dilation*(weight_size-1)}
                     value={padding}
-                    onChange={(e) => this.setState({padding: parseInt(e.target.value, 10)})}
+                    onChange={onChange("padding")}
                     />
           </fieldset>
           <fieldset>
@@ -161,7 +170,7 @@ class App extends React.Component {
             <Slider min="1"
                     max={maxWhile(1, 100, (x) => paramsOK(input_size, weight_size, padding, x, stride))}
                     value={dilation}
-                    onChange={(e) => this.setState({dilation: parseInt(e.target.value, 10)})}
+                    onChange={onChange("dilation")}
                     disabled={weight_size === 1}
                     />
           </fieldset>
@@ -170,7 +179,7 @@ class App extends React.Component {
             <Slider min="1"
                     max={Math.max(input_size-dilation*(weight_size-1), 1)}
                     value={stride}
-                    onChange={(e) => this.setState({stride: parseInt(e.target.value, 10)})}
+                    onChange={onChange("stride")}
                     />
           </fieldset>
         </form>
@@ -186,8 +195,20 @@ class Viewport extends React.Component {
     this.state = {
       hoverOver: undefined,
       hoverH: undefined,
-      hoverW: undefined
+      hoverW: undefined,
+      counter: 0
     };
+  }
+
+  tick() {
+    this.setState({counter: this.state.counter + 1});
+  }
+
+  componentDidMount() {
+    this.interval = setInterval(this.tick.bind(this), 1000);
+  }
+  componentWillUnmount() {
+    clearInterval(this.interval);
   }
 
   render() {
@@ -220,6 +241,13 @@ class Viewport extends React.Component {
         }
         return r;
       };
+    }
+
+    if (!hoverOver) {
+      hoverOver = "output";
+      const i = this.state.counter % (output_size * output_size);
+      hoverH = Math.floor(i / output_size);
+      hoverW = i % output_size;
     }
 
     if (hoverOver === "input") {
@@ -363,7 +391,7 @@ function Grid(props) {
     });
     return <tr key={i}>{xrow}</tr>;
   });
-  return <table>{xgrid}</table>;
+  return <table><tbody>{xgrid}</tbody></table>;
 }
 
 // ========================================

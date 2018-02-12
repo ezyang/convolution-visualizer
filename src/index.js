@@ -326,7 +326,6 @@ class Viewport extends React.Component {
       inputColorizer = inputColorizerWrapper((i, j) => {
         const color = xyScale(hoverH, hoverW);
         const s = crawling_input_multiplies_with_weight[i * padded_input_size + j];
-        let fallback = false;
         if (s) {
           if (s[0] === hoverH && s[1] === hoverW) {
             return color.darker(1);

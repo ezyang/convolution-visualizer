@@ -64,6 +64,8 @@ class App extends React.Component {
     const stride = this.state.stride;
     const padded_input_size = input_size + padding * 2;
 
+    // TODO: transposed convolution
+
     function computeOutputSize(input_size, weight_size, padding, dilation, stride) {
       return Math.floor((input_size + 2 * padding - dilation * (weight_size - 1) - 1) / stride + 1);
     }
@@ -123,8 +125,8 @@ class App extends React.Component {
         <p>
           This interactive application demonstrates how various convolution parameters
           affect shapes and data dependencies between the input, weight and
-          output matrices.  Hovering over an output will highlight which
-          inputs contributed to the output, while hovering over an weight
+          output matrices.  Hovering over an input/output will highlight the
+          corresponding output/input, while hovering over an weight
           will highlight which inputs were multiplied into that weight to
           compute an output.
         </p>
@@ -296,7 +298,7 @@ class Viewport extends React.Component {
     return (
       <div className="viewport">
         <div className="grid-container">
-          Input ({input_size} x {input_size}):
+          Input ({input_size} × {input_size}):
           <Grid size={input_size + 2 * padding}
                 colorizer={inputColorizer}
                 onMouseEnter={(e, i, j) => {
@@ -308,7 +310,7 @@ class Viewport extends React.Component {
                 />
         </div>
         <div className="grid-container">
-          Weight ({weight_size} x {weight_size}):
+          Weight ({weight_size} × {weight_size}):
           <Grid size={weight_size}
                 colorizer={weightColorizer}
                 onMouseEnter={(e, i, j) => {
@@ -320,7 +322,7 @@ class Viewport extends React.Component {
                 />
         </div>
         <div className="grid-container">
-          Output ({output_size} x {output_size}):
+          Output ({output_size} × {output_size}):
           <Grid size={output_size}
                 colorizer={outputColorizer}
                 onMouseEnter={(e, i, j) => {

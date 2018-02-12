@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import * as d3 from 'd3v4';
-import * as d3c from 'd3-scale-chromatic';
 import './index.css';
 
 function Slider(props) {
@@ -243,11 +242,13 @@ class Viewport extends React.Component {
       };
     }
 
+    const flat_crawling = this.state.counter % (output_size * output_size);
+    const crawlingH = Math.floor(flat_crawling / output_size);
+    const crawlingW = flat_crawling % output_size;
     if (!hoverOver) {
       hoverOver = "output";
-      const i = this.state.counter % (output_size * output_size);
-      hoverH = Math.floor(i / output_size);
-      hoverW = i % output_size;
+      hoverH = crawlingH;
+      hoverW = crawlingW;
     }
 
     if (hoverOver === "input") {
@@ -256,19 +257,17 @@ class Viewport extends React.Component {
       hoverW = Math.min(Math.floor(hoverW / stride), output_size - 1);
     }
 
-    if (hoverOver === "output") {
-      const scale_size = weight_size;
-      const xScale = d3.scaleSequential(d3c.interpolateBlues).domain([-1, scale_size])
-      const yScale = d3.scaleSequential(d3c.interpolateGreens).domain([-1, scale_size])
-      function xyScale(i, j) {
-        return d3.interpolateLab(xScale(i), yScale(j))((j-i) / (scale_size-1));
-      }
+    const scale_size = weight_size;
+    // Constraints: everything needs to be saturated enough so
+    // it is clearly distinguished from shadows.  Probably something
+    // a lot better to use here...
+    const xScale = d3.scaleSequential(d3.interpolateLab('#d7191c', '#2c7bb6')).domain([-1, scale_size])
+    const yScale = d3.scaleSequential(d3.interpolateLab('#d7191c', d3.color('#1a9641').brighter(1))).domain([-1, scale_size])
+    function xyScale(i, j) {
+      return d3.color(d3.interpolateLab(xScale(i), yScale(j))((j-i) / (scale_size-1)));
+    }
 
-      outputColorizer = (i, j) => {
-        if (hoverH === i && hoverW === j) {
-          return '#666';
-        }
-      };
+    function compute_input_multiplies_with_weight(hoverH, hoverW) {
       const input_multiplies_with_weight = array1d(padded_input_size * padded_input_size);
       // input_multiplies_with_weight[input_height][input_width] = [weight_height, weight_width]
       for (let h_weight = 0; h_weight < weight_size; h_weight++) {
@@ -278,26 +277,41 @@ class Viewport extends React.Component {
           input_multiplies_with_weight[flat_input] = [h_weight, w_weight];
         }
       }
+      return input_multiplies_with_weight;
+    }
+
+    if (hoverOver === "output") {
+      outputColorizer = (i, j) => {
+        const base = d3.color('#666')
+        if (hoverH === i && hoverW === j) {
+          return base;
+        }
+        if (crawlingH === i && crawlingW === j) {
+          base.opacity = 0.2;
+          return base;
+        }
+      };
+      const input_multiplies_with_weight = compute_input_multiplies_with_weight(hoverH, hoverW);
+      const crawling_input_multiplies_with_weight = compute_input_multiplies_with_weight(crawlingH, crawlingW);
       inputColorizer = inputColorizerWrapper((i, j) => {
         const r = input_multiplies_with_weight[i * padded_input_size + j];
         if (r) {
           return xyScale(r[0], r[1]);
+        }
+        const s = crawling_input_multiplies_with_weight[i * padded_input_size + j];
+        if (s) {
+          const color = xyScale(s[0], s[1]);
+          color.opacity = 0.2;
+          return color;
         }
       });
       weightColorizer = (i, j) => {
         return xyScale(i, j);
       };
     } else if (hoverOver === "weight") {
-      const scale_size = output_size;
-      const xScale = d3.scaleSequential(d3c.interpolateReds).domain([-1, scale_size])
-      const yScale = d3.scaleSequential(d3c.interpolateOranges).domain([-1, scale_size])
-      function xyScale(i, j) {
-        return d3.interpolateLab(xScale(i), yScale(j))((j-i) / (scale_size-1));
-      }
-
       weightColorizer = (i, j) => {
         if (hoverH === i && hoverW === j) {
-          return '#666';
+          return xyScale(hoverH, hoverW);
         }
       };
       const input_produces_output = array1d(padded_input_size * padded_input_size);
@@ -308,17 +322,37 @@ class Viewport extends React.Component {
           input_produces_output[flat_input] = [h_out, w_out];
         }
       }
+      const crawling_input_multiplies_with_weight = compute_input_multiplies_with_weight(crawlingH, crawlingW);
       inputColorizer = inputColorizerWrapper((i, j) => {
+        const color = xyScale(hoverH, hoverW);
+        const s = crawling_input_multiplies_with_weight[i * padded_input_size + j];
+        let fallback = false;
+        if (s) {
+          if (s[0] === hoverH && s[1] === hoverW) {
+            return color.darker(1);
+          }
+        }
         const r = input_produces_output[i * padded_input_size + j];
         if (r) {
-          return xyScale(r[0], r[1]);
+          if (s) {
+            color.opacity = 0.8;
+            return color;
+          }
+          return color;
+        }
+        if (s) {
+          const color = xyScale(s[0], s[1]);
+          color.opacity = 0.2;
+          return color;
         }
       });
-      outputColorizer = xyScale;
-    } else {
-      inputColorizer = inputColorizerWrapper((i, j) => {
-        return;
-      });
+      outputColorizer = (i, j) => {
+        const color = xyScale(hoverH, hoverW);
+        if (i === crawlingH && j === crawlingW) {
+          return color.darker(1);
+        }
+        return color;
+      };
     }
 
     //const inputH = this.props.output[this.state.outputH];

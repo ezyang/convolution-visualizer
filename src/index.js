@@ -201,12 +201,16 @@ class App extends React.Component {
         <h1>Convolution Visualizer</h1>
         <div className="author">Edward Z. Yang</div>
         <p>
-          This interactive application demonstrates how various convolution parameters
+          This interactive visualization demonstrates how various convolution parameters
           affect shapes and data dependencies between the input, weight and
           output matrices.  Hovering over an input/output will highlight the
           corresponding output/input, while hovering over an weight
           will highlight which inputs were multiplied into that weight to
-          compute an output.
+          compute an output.  (Strictly speaking, the operation visualized
+          here is a <em>correlation</em>, not a convolution, as a true
+          convolution flips its weights before performing a correlation.
+          However, most deep learning frameworks still call these convolutions,
+          and in the end it's all the same to gradient descent.)
         </p>
         <form className="form">
           <fieldset>

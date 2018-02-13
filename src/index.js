@@ -69,7 +69,6 @@ class App extends React.Component {
       return Math.floor((input_size + 2 * padding - dilation * (weight_size - 1) - 1) / stride + 1);
     }
     function paramsOK(input_size, weight_size, padding, dilation, stride) {
-      console.log(input_size, weight_size, padding, dilation, stride, computeOutputSize(input_size, weight_size, padding, dilation, stride));
       return computeOutputSize(input_size, weight_size, padding, dilation, stride) > 0;
     }
     const output_size = computeOutputSize(input_size, weight_size, padding, dilation, stride);

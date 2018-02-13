@@ -9,9 +9,7 @@ and [D3.js](https://d3js.org/).
 
 Want to play around with the code?  Clone this repository and run `yarn
 start` to start a development instance.  The main code lives in
-`src/index.js`.  This [React manual](https://github.com/fa
-cebookincubator/create-react-app/blob/master/packages/react-scripts/template/REA
-DME.md) may be of interest.
+`src/index.js`.  This [React manual](https://github.com/facebookincubator/create-react-app/blob/master/packages/react-scripts/template/README.md) may be of interest.
 
 Here are some project ideas:
 

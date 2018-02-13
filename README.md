@@ -36,6 +36,7 @@ Here are some project ideas:
 * Support bigger input sizes than 16 (decreasing the size of
   the squares when inputs are large), and optimize the code so that it
   still runs quickly in these cases.
+* Support assymmetric inputs/kernels/strides/dilations.
 
 Bigger projects:
 

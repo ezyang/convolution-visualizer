@@ -1,6 +1,10 @@
-h1 { margin-bottom: 0 }
+h1 {
+  margin-bottom: 0;
+}
 
-.author { margin-left: 2em; }
+.author {
+  margin-left: 2em;
+}
 
 p {
   max-width: 80em;
@@ -9,7 +13,7 @@ p {
 body {
   font: 14px "Century Gothic", Futura, sans-serif;
   margin: 20px;
-  margin-right:40px;
+  margin-right: 40px;
 }
 
 .form {
@@ -19,10 +23,13 @@ body {
 
 .viewport {
   margin-left: 16em;
+  display: flex;
+  flex-flow: row wrap;
 }
 
 .grid-container {
   margin-bottom: 1em;
+  margin-right: 5em;
 }
 
 table {

@@ -291,7 +291,6 @@ class Viewport extends React.Component {
       // What is our animation timestep?  A monotonically
       // increasing integer.
       counter: 0,
-      speed: props.speed
     };
   }
 

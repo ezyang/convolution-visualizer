@@ -290,7 +290,7 @@ class Viewport extends React.Component {
       hoverW: undefined,
       // What is our animation timestep?  A monotonically
       // increasing integer.
-      counter: 0,
+      counter: 0
     };
   }
 

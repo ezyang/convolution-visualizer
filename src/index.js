@@ -187,7 +187,7 @@ class App extends React.Component {
         const r = parseInt(e.target.value, 10);
         // Text inputs can sometimes temporarily be in invalid states.
         // If it's not a valid number, refuse to set it.
-        if (typeof r !== "undefined") {
+        if (!isNaN(r)) {
           this.setState({[state_key]: r});
         }
       };

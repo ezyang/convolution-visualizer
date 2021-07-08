@@ -120,6 +120,7 @@ class App extends React.Component {
       padding: 0,
       dilation: 1,
       stride: 1,
+      speed: 1
     };
   }
 
@@ -143,6 +144,7 @@ class App extends React.Component {
     const padding = this.state.padding;
     const dilation = this.state.dilation;
     const stride = this.state.stride;
+    const speed = this.state.speed;
     const padded_input_size = input_size + padding * 2;
 
     // TODO: transposed convolution
@@ -180,6 +182,7 @@ class App extends React.Component {
       padded_input_size: padded_input_size,
       output_size: output_size,
       output: output,
+      speed: speed
     }, this.state);
 
     const onChange = (state_key) => {
@@ -255,6 +258,14 @@ class App extends React.Component {
                     onChange={onChange("stride")}
                     />
           </fieldset>
+          <fieldset>
+            <legend>Animation Speed:</legend>
+            <Slider min="1"
+                    max={50}
+                    value={speed}
+                    onChange={onChange("speed")}
+                    />
+          </fieldset>
         </form>
         <Viewport {...params} />
       </div>
@@ -291,6 +302,10 @@ class Viewport extends React.Component {
   }
   componentDidMount() {
     this.interval = setInterval(this.tick.bind(this), 1000);  // 1 second
+  }
+  componentDidUpdate()  {
+    clearInterval(this.interval);
+    this.interval = setInterval(this.tick.bind(this), parseInt(1000 / (this.props.speed)));
   }
   componentWillUnmount() {
     clearInterval(this.interval);

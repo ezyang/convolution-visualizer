@@ -52,7 +52,7 @@ function array2d(height, width, f) {
 }
 
 /**
- * The classic convolution output size formula.
+ * The classic convolution output size formula for a single dimension.
  *
  * The derivation for many special cases is worked out in:
  * http://deeplearning.net/software/theano/tutorial/conv_arithmetic.html
@@ -64,9 +64,12 @@ function computeOutputSize(input_size, weight_size, padding, dilation, stride) {
 /**
  * Test if a set of parameters is valid.
  */
-function paramsOK(input_size, weight_size, padding, dilation, stride) {
-  return computeOutputSize(input_size, weight_size, padding, dilation, stride) > 0;
+function paramsOK(input_h, input_w, weight_h, weight_w, padding, dilation, stride_h, stride_w) {
+  const output_h = computeOutputSize(input_h, weight_h, padding, dilation, stride_h);
+  const output_w = computeOutputSize(input_w, weight_w, padding, dilation, stride_w);
+  return output_h > 0 && output_w > 0;
 }
+
 
 // We use the next two functions (maxWhile and minWhile) to
 // inefficiently compute the bounds for various parameters
@@ -115,11 +118,18 @@ class App extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-      input_size: 5,
-      weight_size: 3,
+      input_height: 5,
+      input_width: 5,
+      weight_height: 3,
+      weight_width: 3,
       padding: 0,
       dilation: 1,
-      stride: 1,
+      stride_height: 1,
+      stride_width: 1,
+      // State to control the UI mode
+      inputShape: 'square',
+      kernelShape: 'square',
+      strideShape: 'square',
     };
   }
 
@@ -137,38 +147,69 @@ class App extends React.Component {
     localStorage.setItem("state", JSON.stringify(this.state));
   }
 
-  render() {
-    const input_size = this.state.input_size;
-    const weight_size = this.state.weight_size;
-    const padding = this.state.padding;
-    const dilation = this.state.dilation;
-    const stride = this.state.stride;
-    const padded_input_size = input_size + padding * 2;
+  // A smarter handler for dimension changes that respects the current shape mode.
+  handleDimensionChange = (type, dimension) => (e) => {
+    const r = parseInt(e.target.value, 10);
+    if (isNaN(r)) return;
 
     // TODO: transposed convolution
+    // FIX: Correctly map the 'type' string to its corresponding state key
+    let shapeKey;
+    if (type === 'input') shapeKey = 'inputShape';
+    else if (type === 'weight') shapeKey = 'kernelShape';
+    else if (type === 'stride') shapeKey = 'strideShape';
 
-    const output_size = computeOutputSize(input_size, weight_size, padding, dilation, stride);
+    const shape = this.state[shapeKey];
 
-    // Compute the convolution symbolically.
+    if (shape === 'square') {
+      // In square mode, the slider controls both height and width
+      this.setState({
+        [`${type}_height`]: r,
+        [`${type}_width`]: r,
+      });
+    } else {
+      // In rectangular mode, sliders are independent
+      this.setState({
+        [`${type}_${dimension}`]: r
+      });
+    }
+  };
+  
+  // Handles the user switching between "Square" and "Rectangular"
+  handleShapeChange = (type) => (e) => {
+    const newShape = e.target.value;
+    const key = `${type}Shape`;
+    
+    if (newShape === 'square') {
+      // When switching back to square, make width equal to height
+      const height = this.state[`${type}_height`];
+      this.setState({
+        [key]: newShape,
+        [`${type}_width`]: height,
+      });
+    } else {
+      this.setState({ [key]: newShape });
+    }
+  };
 
-    // output[output_height][output_width] =
-    //    symbolic expression s for this cell, where
-    //    s[kernel_height][kernel_width] =
-    //      the flat input index multiplied against this kernel entry
-    //      (undefined if this entry not used)
-    //
-    // Recall: the flat input index for (i, j) in a square matrix is 'i * size + j'
-    const output = array2d(output_size, output_size, (i, j) => array2d(weight_size, weight_size));
+  render() {
+    const { input_height, input_width, weight_height, weight_width, padding, dilation, stride_height, stride_width, inputShape, kernelShape, strideShape } = this.state;
 
-    for (let h_out = 0; h_out < output_size; h_out++) {
-      for (let w_out = 0; w_out < output_size; w_out++) {
-        for (let h_kern = 0; h_kern < weight_size; h_kern++) {
-          for (let w_kern = 0; w_kern < weight_size; w_kern++) {
-            // NB: We purposely don't apply padding here, this is
-            // handled at render time.
-            const h_im = h_out * stride + h_kern * dilation;
-            const w_im = w_out * stride + w_kern * dilation;
-            output[h_out][w_out][h_kern][w_kern] = h_im * padded_input_size + w_im;
+    const padded_input_height = input_height + padding * 2;
+    const padded_input_width = input_width + padding * 2;
+
+    const output_height = computeOutputSize(input_height, weight_height, padding, dilation, stride_height);
+    const output_width = computeOutputSize(input_width, weight_width, padding, dilation, stride_width);
+
+    const output = array2d(output_height, output_width, (i, j) => array2d(weight_height, weight_width));
+
+    for (let h_out = 0; h_out < output_height; h_out++) {
+      for (let w_out = 0; w_out < output_width; w_out++) {
+        for (let h_kern = 0; h_kern < weight_height; h_kern++) {
+          for (let w_kern = 0; w_kern < weight_width; w_kern++) {
+            const h_im = h_out * stride_height + h_kern * dilation;
+            const w_im = w_out * stride_width + w_kern * dilation;
+            output[h_out][w_out][h_kern][w_kern] = h_im * padded_input_width + w_im;
           }
         }
       }
@@ -177,25 +218,25 @@ class App extends React.Component {
     // Make an extended params dictionary with our new computed values
     // to pass to the inner component.
     const params = Object.assign({
-      padded_input_size: padded_input_size,
-      output_size: output_size,
+      padded_input_height: padded_input_height,
+      padded_input_width: padded_input_width,
+      output_height: output_height,
+      output_width: output_width,
       output: output,
     }, this.state);
 
-    const onChange = (state_key) => {
-      return (e) => {
+    const onChange = (state_key) => (e) => {
         const r = parseInt(e.target.value, 10);
         // Text inputs can sometimes temporarily be in invalid states.
         // If it's not a valid number, refuse to set it.
         if (!isNaN(r)) {
-          this.setState({[state_key]: r});
+            this.setState({[state_key]: r});
         }
-      };
     };
 
     // An arbitrary constant I found aesthetically pleasing.
     const max_input_size = 16;
-
+    
     return (
       <div>
         <h1>Convolution Visualizer</h1>
@@ -215,44 +256,142 @@ class App extends React.Component {
         <form className="form">
           <fieldset>
             <legend>Input size:</legend>
-            <Slider min={minWhile(max_input_size, 1, (x) => paramsOK(x, weight_size, padding, dilation, stride))}
+            <select value={inputShape} onChange={this.handleShapeChange('input')}>
+              <option value="square">Square</option>
+              <option value="rectangular">Rectangular</option>
+            </select>
+            
+            {inputShape === 'square' && (
+              <div>
+                <Slider 
+                  min={minWhile(max_input_size, 1, (x) => paramsOK(x, x, weight_height, weight_width, padding, dilation, stride_height, stride_width))}
+                  max={max_input_size}
+                  value={input_height}
+                  onChange={this.handleDimensionChange('input', 'height')}
+                />
+              </div>
+            )}
+
+            {inputShape === 'rectangular' && (
+              <React.Fragment>
+                <div><label>Height:</label></div>
+                <div>
+                  <Slider
+                    min={minWhile(max_input_size, 1, (x) => paramsOK(x, input_width, weight_height, weight_width, padding, dilation, stride_height, stride_width))}
                     max={max_input_size}
-                    value={input_size}
-                    onChange={onChange("input_size")}
-                    />
+                    value={input_height}
+                    onChange={this.handleDimensionChange('input', 'height')}
+                  />
+                </div>
+                <div><label>Width:</label></div>
+                <div>
+                  <Slider
+                    min={minWhile(max_input_size, 1, (x) => paramsOK(input_height, x, weight_height, weight_width, padding, dilation, stride_height, stride_width))}
+                    max={max_input_size}
+                    value={input_width}
+                    onChange={this.handleDimensionChange('input', 'width')}
+                  />
+                </div>
+              </React.Fragment>
+            )}
           </fieldset>
           <fieldset>
             <legend>Kernel size:</legend>
-            <Slider min="1"
-                    max={maxWhile(1, 100, (x) => paramsOK(input_size, x, padding, dilation, stride))}
-                    value={weight_size}
-                    onChange={onChange("weight_size")}
-                    />
+            <select value={kernelShape} onChange={this.handleShapeChange('kernel')}>
+              <option value="square">Square</option>
+              <option value="rectangular">Rectangular</option>
+            </select>
+
+            {kernelShape === 'square' && (
+              <div>
+                <Slider
+                  min="1"
+                  max={maxWhile(1, 100, (x) => paramsOK(input_height, input_width, x, x, padding, dilation, stride_height, stride_width))}
+                  value={weight_height}
+                  onChange={this.handleDimensionChange('weight', 'height')}
+                />
+              </div>
+            )}
+
+            {kernelShape === 'rectangular' && (
+              <React.Fragment>
+                <div><label>Height:</label></div>
+                <div>
+                  <Slider
+                    min="1"
+                    max={maxWhile(1, 100, (x) => paramsOK(input_height, input_width, x, weight_width, padding, dilation, stride_height, stride_width))}
+                    value={weight_height}
+                    onChange={this.handleDimensionChange('weight', 'height')}
+                  />
+                </div>
+                <div><label>Width:</label></div>
+                <div>
+                  <Slider
+                    min="1"
+                    max={maxWhile(1, 100, (x) => paramsOK(input_height, input_width, weight_height, x, padding, dilation, stride_height, stride_width))}
+                    value={weight_width}
+                    onChange={this.handleDimensionChange('weight', 'width')}
+                  />
+                </div>
+              </React.Fragment>
+            )}
           </fieldset>
           <fieldset>
             <legend>Padding:</legend>
-            <Slider min={minWhile(dilation*(weight_size-1), 0,
-                                  (x) => paramsOK(input_size, weight_size, x, dilation, stride))}
-                    max={dilation*(weight_size-1)}
+            <Slider min={minWhile(100, 0, (x) => paramsOK(input_height, input_width, weight_height, weight_width, x, dilation, stride_height, stride_width))}
+                    max={maxWhile(0, 100, (x) => paramsOK(input_height, input_width, weight_height, weight_width, x, dilation, stride_height, stride_width))}
                     value={padding}
                     onChange={onChange("padding")}
                     />
           </fieldset>
+           <fieldset>
+            <legend>Stride:</legend>
+             <select value={strideShape} onChange={this.handleShapeChange('stride')}>
+              <option value="square">Square</option>
+              <option value="rectangular">Rectangular</option>
+            </select>
+
+            {strideShape === 'square' && (
+              <div>
+                <Slider
+                  min="1"
+                  max={maxWhile(1, 100, (x) => paramsOK(input_height, input_width, weight_height, weight_width, padding, dilation, x, x))}
+                  value={stride_height}
+                  onChange={this.handleDimensionChange('stride', 'height')}
+                />
+              </div>
+            )}
+
+            {strideShape === 'rectangular' && (
+              <React.Fragment>
+                <div><label>Height:</label></div>
+                <div>
+                  <Slider
+                    min="1"
+                    max={maxWhile(1, 100, (x) => paramsOK(input_height, input_width, weight_height, weight_width, padding, dilation, x, stride_width))}
+                    value={stride_height}
+                    onChange={this.handleDimensionChange('stride', 'height')}
+                  />
+                </div>
+                <div><label>Width:</label></div>
+                <div>
+                  <Slider
+                    min="1"
+                    max={maxWhile(1, 100, (x) => paramsOK(input_height, input_width, weight_height, weight_width, padding, dilation, stride_height, x))}
+                    value={stride_width}
+                    onChange={this.handleDimensionChange('stride', 'width')}
+                  />
+                </div>
+              </React.Fragment>
+            )}
+          </fieldset>
           <fieldset>
             <legend>Dilation:</legend>
             <Slider min="1"
-                    max={maxWhile(1, 100, (x) => paramsOK(input_size, weight_size, padding, x, stride))}
+                    max={maxWhile(1, 100, (x) => paramsOK(input_height, input_width, weight_height, weight_width, padding, x, stride_height, stride_width))}
                     value={dilation}
                     onChange={onChange("dilation")}
-                    disabled={weight_size === 1}
-                    />
-          </fieldset>
-          <fieldset>
-            <legend>Stride:</legend>
-            <Slider min="1"
-                    max={Math.max(input_size-dilation*(weight_size-1), 1)}
-                    value={stride}
-                    onChange={onChange("stride")}
+                    disabled={weight_height === 1 && weight_width === 1}
                     />
           </fieldset>
         </form>
@@ -297,13 +436,9 @@ class Viewport extends React.Component {
   }
 
   render() {
-    const input_size = this.props.input_size;
-    const padded_input_size = this.props.padded_input_size;
-    const weight_size = this.props.weight_size;
-    const output_size = this.props.output_size;
-    const output = this.props.output;
-    const padding = this.props.padding;
-    const stride = this.props.stride;
+    const { input_height, input_width, padded_input_height, padded_input_width,
+            weight_height, weight_width, output_height, output_width,
+            output, padding, stride_height, stride_width } = this.props;
 
     let hoverOver = this.state.hoverOver;
     let hoverH = this.state.hoverH;
@@ -330,7 +465,7 @@ class Viewport extends React.Component {
         } else {
           r = d3.color(r);
         }
-        if (i < padding || i >= input_size + padding || j < padding || j >= input_size + padding) {
+        if (i < padding || i >= input_height + padding || j < padding || j >= input_width + padding) {
           r = r.darker(2.5);
         }
         return r;
@@ -339,9 +474,9 @@ class Viewport extends React.Component {
 
     // Given the animation timestep, determine the output coordinates
     // of our animated stencil.
-    const flat_animated = this.state.counter % (output_size * output_size);
-    const animatedH = Math.floor(flat_animated / output_size);
-    const animatedW = flat_animated % output_size;
+    const flat_animated = this.state.counter % (output_height * output_width);
+    const animatedH = Math.floor(flat_animated / output_width);
+    const animatedW = flat_animated % output_width;
 
     // If the user is not hovering over any matrix, render "as if"
     // they were hovering over the animated output coordinate.
@@ -356,8 +491,8 @@ class Viewport extends React.Component {
     // top-left corner of the stencil is attached to the cursor.
     if (hoverOver === "input") {
       hoverOver = "output";
-      hoverH = Math.min(Math.floor(hoverH / stride), output_size - 1);
-      hoverW = Math.min(Math.floor(hoverW / stride), output_size - 1);
+      hoverH = Math.min(Math.floor(hoverH / stride_height), output_height - 1);
+      hoverW = Math.min(Math.floor(hoverW / stride_width), output_width - 1);
     }
 
     // Generate the color interpolator for generating the kernels.
@@ -380,11 +515,28 @@ class Viewport extends React.Component {
     // If you are a visualization expert and have a pet 2D color
     // interpolation scheme, please try swapping it in here and seeing
     // how it goes.
-    const scale_size = weight_size;
-    const xScale = d3.scaleSequential(d3.interpolateLab('#d7191c', '#2c7bb6')).domain([-1, scale_size])
-    const yScale = d3.scaleSequential(d3.interpolateLab('#d7191c', d3.color('#1a9641').brighter(1))).domain([-1, scale_size])
-    function xyScale(i, j) {
-      return d3.color(d3.interpolateLab(xScale(i), yScale(j))((j-i) / (scale_size-1)));
+    const xScale = d3.scaleSequential(d3.interpolateLab('#d7191c', '#2c7bb6'))
+      .domain([-1, weight_height]);
+
+    // The yScale (Red->Green) is driven by the column index `j`.
+    const yScale = d3.scaleSequential(d3.interpolateLab('#d7191c', d3.color('#1a9641').brighter(1)))
+      .domain([-1, weight_width]);
+
+    const max_dim = Math.max(weight_height, weight_width);
+    
+    function xyScale(i, j) { // i for height index, j for width index
+      // Get the end-point colors for this specific cell's gradient
+      const color1 = xScale(i);
+      const color2 = yScale(j);
+      
+      // The interpolation factor determines the mix between color1 and color2
+      const factor = (max_dim > 1) ? (j - i) / (max_dim - 1) : 0.5;
+
+      // We need to normalize the factor to be in the [0, 1] range for the interpolator.
+      // The original factor is roughly in [-1, 1], so this mapping works.
+      const normalizedFactor = (factor + 1) / 2;
+
+      return d3.color(d3.interpolateLab(color1, color2)(normalizedFactor));
     }
 
     // Given an output coordinate 'hoverH, hoverW', compute a mapping
@@ -392,14 +544,16 @@ class Viewport extends React.Component {
     // that input.
     //
     // Result:
-    //    r[input_height][input_width] = [weight_height, weight_width]
+    //    r[flat_input_index] = [weight_height, weight_width]
     function compute_input_multiplies_with_weight(hoverH, hoverW) {
-      const input_multiplies_with_weight = array1d(padded_input_size * padded_input_size);
-      for (let h_weight = 0; h_weight < weight_size; h_weight++) {
-        for (let w_weight = 0; w_weight < weight_size; w_weight++) {
-          const flat_input = output[hoverH][hoverW][h_weight][w_weight];
-          if (typeof flat_input === "undefined") continue;
-          input_multiplies_with_weight[flat_input] = [h_weight, w_weight];
+      const input_multiplies_with_weight = array1d(padded_input_height * padded_input_width);
+      if (hoverH >= 0 && hoverH < output_height && hoverW >= 0 && hoverW < output_width) {
+        for (let h_weight = 0; h_weight < weight_height; h_weight++) {
+          for (let w_weight = 0; w_weight < weight_width; w_weight++) {
+            const flat_input = output[hoverH][hoverW][h_weight][w_weight];
+            if (typeof flat_input === "undefined") continue;
+            input_multiplies_with_weight[flat_input] = [h_weight, w_weight];
+          }
         }
       }
       return input_multiplies_with_weight;
@@ -428,7 +582,7 @@ class Viewport extends React.Component {
         // If this input was used to compute the selected output, render
         // it the same color as the corresponding entry in the weight
         // matrix which it was multiplied against.
-        const r = input_multiplies_with_weight[i * padded_input_size + j];
+        const r = input_multiplies_with_weight[i * padded_input_width + j];
         if (r) {
           return xyScale(r[0], r[1]);
         }
@@ -436,7 +590,7 @@ class Viewport extends React.Component {
         // Otherwise, if the input was used to compute the animated
         // output, render it as a lighter version of the weight color it was
         // multiplied against.
-        const s = animated_input_multiplies_with_weight[i * padded_input_size + j];
+        const s = animated_input_multiplies_with_weight[i * padded_input_width + j];
         if (s) {
           return whiten(xyScale(s[0], s[1]), 0.8);
         }
@@ -459,9 +613,9 @@ class Viewport extends React.Component {
 
       // Compute a mapping from flat input index to output coordinates which
       // this input multiplied with the selected weight to produce.
-      const input_produces_output = array1d(padded_input_size * padded_input_size);
-      for (let h_out = 0; h_out < output_size; h_out++) {
-        for (let w_out = 0; w_out < output_size; w_out++) {
+      const input_produces_output = array1d(padded_input_height * padded_input_width);
+      for (let h_out = 0; h_out < output_height; h_out++) {
+        for (let w_out = 0; w_out < output_width; w_out++) {
           const flat_input = output[h_out][w_out][hoverH][hoverW];
           if (typeof flat_input === "undefined") continue;
           input_produces_output[flat_input] = [h_out, w_out];
@@ -480,7 +634,7 @@ class Viewport extends React.Component {
         // produce the animated output, darken it.  This shows the
         // current animation step's "contribution" to the colored
         // inputs.
-        const s = animated_input_multiplies_with_weight[i * padded_input_size + j];
+        const s = animated_input_multiplies_with_weight[i * padded_input_width + j];
         if (s) {
           if (s[0] === hoverH && s[1] === hoverW) {
             return color.darker(1);
@@ -489,7 +643,7 @@ class Viewport extends React.Component {
 
         // If this input cell was multiplied by the selected weight to
         // produce *some* output, render it as the weight's color.
-        const r = input_produces_output[i * padded_input_size + j];
+        const r = input_produces_output[i * padded_input_width + j];
         if (r) {
           // BUT, if the input cell is part of the current animation
           // stencil, lighten it so that we can still see the stencil.
@@ -522,8 +676,8 @@ class Viewport extends React.Component {
     return (
       <div className="viewport">
         <div className="grid-container">
-          Input ({input_size} × {input_size}):
-          <Grid size={input_size + 2 * padding}
+          Input ({input_height} × {input_width}):
+          <Grid height={padded_input_height} width={padded_input_width}
                 colorizer={inputColorizer}
                 onMouseEnter={(e, i, j) => {
                   this.setState({hoverOver: "input", hoverH: i, hoverW: j});
@@ -534,8 +688,8 @@ class Viewport extends React.Component {
                 />
         </div>
         <div className="grid-container">
-          Weight ({weight_size} × {weight_size}):
-          <Grid size={weight_size}
+          Weight ({weight_height} × {weight_width}):
+          <Grid height={weight_height} width={weight_width}
                 colorizer={weightColorizer}
                 onMouseEnter={(e, i, j) => {
                   this.setState({hoverOver: "weight", hoverH: i, hoverW: j});
@@ -546,8 +700,8 @@ class Viewport extends React.Component {
                 />
         </div>
         <div className="grid-container">
-          Output ({output_size} × {output_size}):
-          <Grid size={output_size}
+          Output ({output_height} × {output_width}):
+          <Grid height={output_height} width={output_width}
                 colorizer={outputColorizer}
                 onMouseEnter={(e, i, j) => {
                   this.setState({hoverOver: "output", hoverH: i, hoverW: j});
@@ -563,10 +717,11 @@ class Viewport extends React.Component {
 }
 
 /**
- * A square matrix grid which we render our matrix animations.
+ * A rectangular matrix grid which we render our matrix animations.
  *
  * Properties:
- *    - size: The height/width of the matrix
+ *    - height: The height of the matrix
+ *    - width: The width of the matrix
  *    - colorizer: A function f(i, j), returning the color of the i,j cell
  *    - onMouseEnter: A callback invoked f(event, i, j) when the i,j cell is
  *                    entered by a mouse.
@@ -574,8 +729,14 @@ class Viewport extends React.Component {
  *                    left by a mouse.
  */
 function Grid(props) {
-  const size = parseInt(props.size, 10);
-  const grid = array2d(size, size);
+  const height = parseInt(props.height, 10) || 0;
+  const width = parseInt(props.width, 10) || 0;
+  
+  if (height <= 0 || width <= 0) {
+      return <table><tbody><tr><td style={{padding: '0.5em'}}>(empty)</td></tr></tbody></table>;
+  }
+  
+  const grid = array2d(height, width);
   const xgrid = grid.map((row, i) => {
     const xrow = row.map((e, j) => {
       // Use of colorizer this way means we force recompute of all tiles
